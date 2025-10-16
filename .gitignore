@@ -1,0 +1,6 @@
+build
+bin
+dependencies
+
+.vscode
+.DS_store
