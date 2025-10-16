@@ -2,7 +2,7 @@
 _A small GPU path tracer inspired by **Ray Tracing in One Weekend**._
 
 <p align="center">
-  <img src="docs/hero.png" alt="Hero render" width="80%">
+  <img src="https://github.com/MindovgTell/Ray-Tracer/blob/master/images/renderer2.png" alt="Hero render" width="80%">
 </p>
 
 ## Highlights
