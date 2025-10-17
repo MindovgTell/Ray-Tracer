@@ -210,7 +210,7 @@ __kernel void render(int width, int height,
     uint seed0 = x;
     uint seed1 = y;
 
-    // Camera (same as yours) ...
+
     Camera camera;
     camera.focal_length     = 1.0f;
     camera.view_port_height = 1.0f;
@@ -233,10 +233,8 @@ __kernel void render(int width, int height,
         }
     }
 
-    // 1) Average
     float3 avg = sum / ((float)SAMPLES_PER_PIXEL * (float)SAMPLES);
 
-    // 2) Tonemap (Reinhard) then 3) gamma
     float3 mapped = avg ;/// (1.0f + avg);
     mapped = (float3)(pow(mapped.x, 1.0f/2.2f),
                       pow(mapped.y, 1.0f/2.2f),

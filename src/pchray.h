@@ -40,8 +40,8 @@ using vec3   = glm::vec3;
 using point3 = glm::vec3;
 
 // Common Headers
-#include "Camera.hpp"
 #include "Material.hpp"
+#include "Camera.hpp"
 #include "Objects.hpp"
 
 #endif // PCHRAY_H
