@@ -38,6 +38,5 @@ _A small GPU path tracer inspired by **Ray Tracing in One Weekend**._
 ### Build
 ```bash
 git clone https://github.com/MindovgTell/RayTracer.git
-cd RayTracer
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
+cd RayTracer/scripts
+./build.sh

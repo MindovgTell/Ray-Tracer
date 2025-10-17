@@ -35,8 +35,13 @@ inline double random_double(double min, double max) {
     return min + (max-min)*random_double();
 }
 
+using color  = glm::vec3;
+using vec3   = glm::vec3;
+using point3 = glm::vec3;
+
 // Common Headers
 #include "Camera.hpp"
+#include "Material.hpp"
 #include "Objects.hpp"
 
 #endif // PCHRAY_H

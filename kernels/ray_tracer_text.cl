@@ -56,6 +56,12 @@ static float get_random(unsigned int *seed0, unsigned int *seed1) {
 	return (res.f - 2.0f) / 2.0f;
 }
 
+
+static float3 get_random_unit_vector(){
+
+    return (float3)(0.0f, 0.0f, 0.0f);
+}
+
 static inline float2 sample_square(const __private float* fseed,
                                    uint* seed0, uint* seed1) // <— NEW
 {
