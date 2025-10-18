@@ -14,7 +14,7 @@ namespace compute::clutils {
         return min + (max-min)*random_double();
     }
 
-    inline std::vector<cl::Platform> getPlatforms() {
+    inline std::vector<cl::Platform> get_platforms() {
 
         /*
         *   Function for getting all available OpenCL platforms.
@@ -31,7 +31,7 @@ namespace compute::clutils {
         return platforms;
     }
 
-    inline std::vector<cl::Device> getDevices(const cl::Platform& platform, cl_device_type type = CL_DEVICE_TYPE_ALL) {
+    inline std::vector<cl::Device> get_devices(const cl::Platform& platform, cl_device_type type = CL_DEVICE_TYPE_ALL) {
 
         /*
         *   Function for getting all available OpenCL devices of a given type from a platform.
@@ -50,7 +50,7 @@ namespace compute::clutils {
 
     
 
-    inline void PrintPlatformsInfo(const std::vector<cl::Platform>& platforms) {
+    inline void print_platforms_info(const std::vector<cl::Platform>& platforms) {
     std::cout << "Platforms: " << platforms.size() << "\n";
         for (size_t i = 0; i < platforms.size(); ++i) {
             const auto& p = platforms[i];
@@ -87,16 +87,16 @@ namespace compute::clutils {
     }
 
 
-    inline std::string DeviceTypeToStr(cl_device_type type) {
+    inline std::string device_type_to_str(cl_device_type type) {
         if (type & CL_DEVICE_TYPE_GPU) return "GPU";
         if (type & CL_DEVICE_TYPE_CPU) return "CPU";
         if (type & CL_DEVICE_TYPE_ACCELERATOR) return "ACCELERATOR";
         return "UNKNOWN";
     }
 
-    inline void PrintDeviceInfo(const cl::Device& device) {
+    inline void print_device_info(const cl::Device& device) {
         std::cout << "Device: " << device.getInfo<CL_DEVICE_NAME>() << "\n";
-        std::cout << "  Type: " << DeviceTypeToStr(device.getInfo<CL_DEVICE_TYPE>()) << "\n";
+        std::cout << "  Type: " << device_type_to_str(device.getInfo<CL_DEVICE_TYPE>()) << "\n";
         std::cout << "  Vendor: " << device.getInfo<CL_DEVICE_VENDOR>() << "\n";
         std::cout << "  Version: " << device.getInfo<CL_DEVICE_VERSION>() << "\n";
         std::cout << "  Driver version: " << device.getInfo<CL_DRIVER_VERSION>() << "\n";
@@ -130,7 +130,7 @@ namespace compute::clutils {
 
 
 
-    inline std::filesystem::path findDirectory(std::string dir_name = "kernels") {
+    inline std::filesystem::path find_directory(std::string dir_name = "kernels") {
         const std::filesystem::path start = std::filesystem::current_path();
 
         // Walk up: start, parent, grandparent, ... until root
@@ -144,7 +144,7 @@ namespace compute::clutils {
             "Couldn't find '" + dir_name + "' directory starting from: " + start.string());
     }
 
-    inline std::string readFileToString(const std::filesystem::path& p) {
+    inline std::string read_file_to_string(const std::filesystem::path& p) {
         std::ifstream ifs(p, std::ios::binary);
         if (!ifs) throw std::runtime_error("Failed to open kernel file: " + p.string());
         std::ostringstream ss;
@@ -153,7 +153,7 @@ namespace compute::clutils {
     }
 
     // Gather all *.cl files from a directory into a vector<string> (sorted deterministically)
-    inline std::vector<std::string> readKernelSourcesFromDir(const std::filesystem::path& dir) {
+    inline std::vector<std::string> read_kernel_sources_from_dir(const std::filesystem::path& dir) {
         if (!std::filesystem::exists(dir) || !std::filesystem::is_directory(dir)) {
             throw std::runtime_error("Kernel directory not found: " + dir.string());
         }
@@ -175,7 +175,7 @@ namespace compute::clutils {
         std::vector<std::string> sources;
         sources.reserve(files.size());
         for (const auto& f : files) {
-            sources.push_back(readFileToString(f));
+            sources.push_back(read_file_to_string(f));
         }
         return sources;
     }

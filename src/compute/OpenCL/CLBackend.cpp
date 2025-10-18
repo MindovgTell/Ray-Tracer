@@ -8,17 +8,17 @@ namespace compute {
     void CLBackend::initialize(const Config& config) {
         try {
             config_ = config;
-            selectPlatform(config_.cl.platform_index); // Select the first platform
-            printPlatformInfo();
+            select_platform(config_.cl.platform_index); // Select the first platform
+            print_platform_info();
 
-            selectDevice(config_.cl.device_index, CL_DEVICE_TYPE_GPU); // Select the first GPU device
-            printDeviceInfo();
+            select_device(config_.cl.device_index, CL_DEVICE_TYPE_GPU); // Select the first GPU device
+            print_device_info();
 
             context_ = cl::Context(device_);
             queue_ = cl::CommandQueue(context_, device_);
 
-            std::string kernel_dir = clutils::findDirectory("kernels");
-            std::vector<std::string> src = clutils::readKernelSourcesFromDir(kernel_dir);
+            std::string kernel_dir = clutils::find_directory("kernels");
+            std::vector<std::string> src = clutils::read_kernel_sources_from_dir(kernel_dir);
 
             for (const auto& k : src) {
                 if (k.empty()) {
@@ -26,7 +26,7 @@ namespace compute {
                 }
             }
 
-            buildProgram(src, config_.cl.build_options);
+            build_program(src, config_.cl.build_options);
 
         } catch (const cl::Error& e) {
             std::cerr << "OpenCL Error: " << e.what() << " : " << e.err() << "\n";
@@ -38,51 +38,31 @@ namespace compute {
     }
 
     void CLBackend::render(const Camera& cam, const Scene& scene) {
-        const size_t W = static_cast<size_t>(config_.width);
-        const size_t H = static_cast<size_t>(config_.height);
+        const size_t W = static_cast<size_t>(cam.get_image_width());
+        const size_t H = static_cast<size_t>(cam.get_image_height());
         const size_t N = W * H;
 
         if (W <= 0 || H <= 0) return;
         if (N > (std::numeric_limits<size_t>::max() / sizeof(cl_uchar4)))
             throw std::runtime_error("Image too large");
 
-        const size_t bytes = N * sizeof(cl_uchar4);
-
-        const size_t obj_num = 5;
-        serialize::SphereGPU cpu_spheres[obj_num];
-        for (size_t i = 0; i < obj_num; ++i) {
-            cpu_spheres[i].radius   = 1.0f;
-            cpu_spheres[i].position = { -2.5f + i*2.5f, -1.0f, -6.0f }; // much closer
-            cpu_spheres[i].color    = { 0.9f - 0.3f*i, 0.2f + 0.3f*i, 0.2f };
-            cpu_spheres[i].emission = { 0.0f, 0.0f, 0.0f }; 
-        }
-
-        cpu_spheres[3].radius   = 0.5f;
-        cpu_spheres[3].position = { 0.0f, 2.0f, -5.0f }; // much closer
-        cpu_spheres[3].color    = { 0.5f, 0.5f, 1.0f };
-        cpu_spheres[3].emission = { 50.0f, 50.0f, 50.0f }; 
-
-        cpu_spheres[4].radius   = 98.0f;
-        cpu_spheres[4].position = { 0.0f, -100.0f, -6.0f }; // much closer
-        cpu_spheres[4].color    = { 0.3f, 0.3f, 0.9f };
-        cpu_spheres[4].emission = { 0.0f, 0.0f, 0.0f }; 
-
-        // Serialize scene objects to GPU format
-        cl::Buffer cl_output(context_, CL_MEM_WRITE_ONLY, N * sizeof(cl_uchar4));
-        cl::Buffer cl_spheres(context_, CL_MEM_READ_ONLY, obj_num * sizeof(serialize::SphereGPU));
-        queue_.enqueueWriteBuffer(cl_spheres, CL_TRUE, 0, obj_num * sizeof(serialize::SphereGPU), cpu_spheres);
+        serialize::PackedScene pscene = serialize::pack_scene(scene, cam);
+        upload_scene(context_, queue_, pscene, gpu_scene_);
+        ensure_output(context_, gpu_scene_, W, H);
 
         // get real rundom number
         cl_float randomseed = clutils::get_random();
 
         // Kernel: __kernel void render(const int height, const int width, __global uchar4* C)
         kernel_ = cl::Kernel(program_, "render");
-        kernel_.setArg(0, static_cast<int>(W));
-        kernel_.setArg(1, static_cast<int>(H));
-        kernel_.setArg(2, cl_spheres);
-        kernel_.setArg(3, static_cast<int>(obj_num));
-        kernel_.setArg(4, randomseed);
-        kernel_.setArg(5, cl_output);
+        int a = 0;
+        kernel_.setArg(a++, W);
+        kernel_.setArg(a++, H);
+        kernel_.setArg(a++, gpu_scene_.camera);
+        kernel_.setArg(a++, gpu_scene_.spheres); kernel_.setArg(a++, scene.get_spheres_count());
+        kernel_.setArg(a++, gpu_sceen_.materials); kernel_.setArg(a++, scene.get_materials_count());
+        kernel_.setArg(a++, randomseed);
+        kernel_.setArg(a++, gpu_scene_.out_rgb);
 
         // One work-item per pixel (x = 0..W-1, y = 0..H-1)
         cl::NDRange global(W, H);
@@ -91,14 +71,14 @@ namespace compute {
 
         // Read back
         std::vector<cl_uchar4> output(N);
-        queue_.enqueueReadBuffer(cl_output, CL_TRUE, 0, bytes, output.data());
+        q_.enqueueReadBuffer(gpu_.out_rgb, CL_TRUE, 0, N*sizeof(cl_char4), out.data());
 
         // Save / use output (example loop)
-        saveImage("rednerer2.ppm", output, W, H);
+        save_image("rednerer3.ppm", output, W, H);
 
     }
 
-    void CLBackend::selectPlatform(int platform_index) {
+    void CLBackend::select_platform(int platform_index) {
         std::vector<cl::Platform> platforms;
         cl::Platform::get(&platforms);
         if (platforms.empty()) {
@@ -110,7 +90,7 @@ namespace compute {
         platform_ = platforms[platform_index];
     }
 
-    void CLBackend::selectDevice(int device_index, cl_device_type type = CL_DEVICE_TYPE_ALL) {
+    void CLBackend::select_device(int device_index, cl_device_type type = CL_DEVICE_TYPE_ALL) {
         if (!platform_()) {
             throw std::runtime_error("Platform not selected.");
         }
@@ -129,7 +109,7 @@ namespace compute {
         return program_.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device_);
     }
 
-    void CLBackend::buildProgram(
+    void CLBackend::build_program(
                               const std::vector<std::string>& kernel_sources, 
                               const std::string& build_options = "") {
         cl::Program::Sources sources;
@@ -148,7 +128,7 @@ namespace compute {
 
 
 
-    void CLBackend::printPlatformInfo() {
+    void CLBackend::print_platform_info() {
         if (!platform_()) {
             throw std::runtime_error("Invalid platform.");
         }
@@ -161,7 +141,7 @@ namespace compute {
         std::cout << "//============================================\n" << std::endl;
     }
 
-    void CLBackend::printDeviceInfo() {
+    void CLBackend::print_device_info() {
         if (!device_()) {
             throw std::runtime_error("Invalid device.");
         }
@@ -182,8 +162,8 @@ namespace compute {
     }
 
 
-    void CLBackend::saveImage(const std::string& filename, const std::vector<cl_uchar4>& image, int width, int height) {
-        auto image_dir = clutils::findDirectory("images");
+    void CLBackend::save_image(const std::string& filename, const std::vector<cl_uchar4>& image, int width, int height) {
+        auto image_dir = clutils::find_directory("images");
         std::filesystem::path filepath = image_dir / filename;
         std::ofstream ofs(filepath);
         if (!ofs) {

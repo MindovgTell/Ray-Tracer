@@ -2,41 +2,29 @@
 #define OBJECTS_HPP
 
 
-class HitRecord {
-public:
-    point3 p;
-    vec3 normal;
-    std::shared_ptr<Material> mat;
-    double t;
-    bool front_face;
-
-    void set_face_normal(const Ray& r, const vec3& outward_normal) {
-        front_face = dot(r.direction(), outward_normal) < 0;
-        normal = front_face ? outward_normal : -outward_normal;
-    }
+class Mesh {
+    std::vector<glm::vec3> positions;     // size = numVerts
+    std::vector<glm::vec3> normals;       // optional
+    std::vector<glm::vec2> uvs;           // optional
+    std::vector<uint32_t>  indices;       // 3*triangleCount
+    int32_t material_index{0};
 };
-
-class Hittable {
-public:
-    virtual ~Hittable() = default;
-    virtual bool hit(const Ray& r, Interval ray_t, HitRecord& rec) const = 0;
-};
-
 
 class Sphere {
     public:
         Sphere () : radius(1.0f), center{0.0f, 0.0f, 0.0f}, color{1.0f, 1.0f, 1.0f}, emission{0.0f, 0.0f, 0.0f} {}
 
         // Getter functions
-        float get_radius()          { return radius;    }
-        glm::vec3 get_center()      { return center;    }
-        glm::vec3 get_color()       { return color;     }
-        glm::vec3 get_emission()    { return emission;  }
+        const float get_radius()   const       { return radius;    }
+        const glm::vec3 get_center_pos()   const   { return center;    }
+        const glm::vec3 get_color()   const    { return color;     }
+        const glm::vec3 get_emission()  const  { return emission;  }
+        const MatTag get_material_index() const { return material;  }
 
 
         // Setter functions
         void set_radius(float r)            { radius    = r;    }
-        void set_center(glm::vec3 cent)     { center    = cent; }
+        void set_center_pos(glm::vec3 cent)     { center    = cent; }
         void set_color(glm::vec3 col)       { color     = col;  }
         void set_emission(glm::vec3 emi)    { emission  = emi;  }
 
@@ -46,18 +34,32 @@ class Sphere {
         glm::vec3 center;
         glm::vec3 color;
         glm::vec3 emission;
+        MatTag material{0};
 };
 
 class Scene {
 
-private:
+public:
     std::vector<Sphere> spheres;
-    std::vector<std::shared_ptr<Material>> materials
+    std::vector<std::shared_ptr<Material>> materials;
+    std::vector<Mesh> meshes;
 public:
     void add_sphere(Sphere& sphere) {
         spheres.push_back(sphere);
     }
 
+    void define_sphere_vec_size(size_t size) {
+        spheres.reserve(size);
+    }
+
+    void set_spheres_vec(const std::vector<Sphere>& vec) {
+        spheres = vec;
+    }
+
+    int get_spheres_count() {return spheres.size();} 
+    int get_spheres_count() {return materials.size();}
+
 };
+
 
 #endif // OBJECTS_HPP

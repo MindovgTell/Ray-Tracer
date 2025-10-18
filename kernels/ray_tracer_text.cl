@@ -6,34 +6,31 @@ __constant int SAMPLES_PER_PIXEL =  20;
 
 typedef struct Camera {
     // Camera settings
-    float focal_length;
-    float view_port_height;
-    float view_port_width;
-    float3 center;
-
-    // Calculate the vectors across the horizontal and down the vertical viewport edges.
-    float3 viewport_x;
-    float3 viewport_y;
-
+    float4 origin; // float4(origin.x, origin.y, origin.z, focal_length) the 4th argument is focal_length
+   
     // Calculate the horizontal and vertical delta vectors from pixel to pixel.
-    float3 pixel_delta_x;
-    float3 pixel_delta_y;
+    float4 pixel_delta_x;
+    float4 pixel_delta_y;
 
-    // Calculate the position of the upper left pixel.
-    float3 viewport_upper_left;
-    float3 pixel00_pos;
+    float4 pixel00_pos;
 } Camera;
 
+typedef struct Material{
+	int    tag; int _pad0,_pad1,_pad2;
+	float4 albedo;
+	float  fuzz, ref_idx; float _p2a,_p2b;
+} Material;
+
 typedef struct Ray{
-	float3 origin;
-	float3 direction;
+	float4 origin;
+	float4 direction;
 } Ray;
 
 typedef struct Sphere{
-	float  radius;
-	float3 position;
-	float3 color;
-	float3 emission;
+	float4 position; // position + radius (float4)(pos.x, pos.y, pos.z, radius)
+	float4 color;
+	float4 emission;
+	int material_index;
 } Sphere;
 
 
@@ -75,8 +72,8 @@ static inline float2 sample_square(const __private float* fseed,
 static inline Ray create_ray(int x, int y, const Camera* cam, float2 jitter)
 {
     Ray r; 
-    r.origin = cam->center;
-    float3 pixel_sample =
+    r.origin = cam->origin;
+    float4 pixel_sample =
         cam->pixel00_pos +
         ((float)x + 0.5f + jitter.x) * cam->pixel_delta_x +
         ((float)y + 0.5f + jitter.y) * cam->pixel_delta_y;
@@ -88,9 +85,9 @@ static inline Ray create_ray(int x, int y, const Camera* cam, float2 jitter)
 				/* (__global Sphere* sphere, const Ray* ray) */
 float intersect_sphere(const Sphere* sphere, const Ray* ray) /* version using local copy of sphere */
 {
-	float3 rayToCenter = sphere->position - ray->origin;
-	float b = dot(rayToCenter, ray->direction);
-	float c = dot(rayToCenter, rayToCenter) - sphere->radius*sphere->radius;
+	float3 rayToCenter = (float3)((sphere->position.xyz - ray->origin.xyz));
+	float b = dot(rayToCenter, (float3)(ray->direction.xyz ));
+	float c = dot(rayToCenter, rayToCenter) - (sphere->position.w)*(sphere->position.w);
 	float disc = b * b - c;
 
 	if (disc < 0.0f) return 0.0f;
@@ -102,7 +99,7 @@ float intersect_sphere(const Sphere* sphere, const Ray* ray) /* version using lo
 	return 0.0f;
 }
 
-bool intersect_scene(__constant Sphere* spheres, const Ray* ray, float* t, int* sphere_id, const int sphere_count)
+bool intersect_scene(__global const Sphere* spheres, const Ray* ray, float* t, int* sphere_id, const int sphere_count)
 {
 	/* initialise t to a very large number, 
 	so t will be guaranteed to be smaller
@@ -133,7 +130,7 @@ bool intersect_scene(__constant Sphere* spheres, const Ray* ray, float* t, int* 
 /* each ray hitting a surface will be reflected in a random direction (by randomly sampling the hemisphere above the hitpoint) */
 /* small optimisation: diffuse ray directions are calculated using cosine weighted importance sampling */
 
-float3 trace(__constant Sphere* spheres, const Ray* camray, const int sphere_count, unsigned int* seed0, unsigned int* seed1){
+float3 trace(__global const Sphere* spheres, const Ray* camray, const int sphere_count, unsigned int* seed0, unsigned int* seed1){
     Ray ray = *camray;
 
 	float3 accum_color = (float3)(0.0f, 0.0f, 0.0f);
@@ -147,7 +144,7 @@ float3 trace(__constant Sphere* spheres, const Ray* camray, const int sphere_cou
 		/* if ray misses scene, return background colour */
 		if (!intersect_scene(spheres, &ray, &t, &hitsphere_id, sphere_count))
 		{
-            float3 d = normalize(ray.direction);
+            float3 d = normalize((float3)(ray.direction.xyz));
             float tbg = 0.5f*(d.y + 1.0f);
             float3 sky = mix((float3)(0.2f,0.2f,0.2f), (float3)(0.0f,0.0f,0.0f), tbg);
             return accum_color + mask * sky;
@@ -157,11 +154,11 @@ float3 trace(__constant Sphere* spheres, const Ray* camray, const int sphere_cou
 		Sphere hitsphere = spheres[hitsphere_id]; /* version with local copy of sphere */
 
 		/* compute the hitpoint using the ray equation */
-		float3 hitpoint = ray.origin + ray.direction * t;
+		float3 hitpoint = ray.origin.xyz + ray.direction.xyz * t;
 		
 		/* compute the surface normal and flip it if necessary to face the incoming ray */
-		float3 normal = normalize(hitpoint - hitsphere.position); 
-		float3 normal_facing = dot(normal, ray.direction) < 0.0f ? normal : normal * (-1.0f);
+		float3 normal = normalize(hitpoint - hitsphere.position.xyz); 
+		float3 normal_facing = dot(normal, ray.direction.xyz) < 0.0f ? normal : normal * (-1.0f);
 
 		/* compute two random numbers to pick a random point on the hemisphere above the hitpoint*/
 		uint salt0 = (uint)*seed0 ^ (uint)(bounces*2+0) * 0x9E3779B9u;
@@ -184,14 +181,14 @@ float3 trace(__constant Sphere* spheres, const Ray* camray, const int sphere_cou
 		float3 newdir = normalize(u * cos(phi)*r2s + v*sin(phi)*r2s + w*sqrt(1.0f - r2));
 
 		/* add a very small offset to the hitpoint to prevent self intersection */
-		ray.origin = hitpoint + normal_facing * EPSILON;
-		ray.direction = newdir;
+		ray.origin = (float4)(hitpoint + normal_facing * EPSILON, 0.0f);
+		ray.direction = (float4)(newdir, 0.0f);
 
 		/* add the colour and light contributions to the accumulated colour */
-		accum_color += mask * hitsphere.emission; 
+		accum_color += mask * hitsphere.emission.xyz; 
 
 		/* the mask colour picks up surface colours at each bounce */
-		mask *= hitsphere.color; 
+		mask *= hitsphere.color.xyz; 
 		
 		/* perform cosine-weighted importance sampling for diffuse surfaces*/
 		mask *= dot(newdir, normal_facing); 
@@ -200,8 +197,10 @@ float3 trace(__constant Sphere* spheres, const Ray* camray, const int sphere_cou
 	return accum_color;
 }
 
-__kernel void render(int width, int height,
-                     __constant Sphere* spheres, int obj_num,
+__kernel void render(int width, int height, 
+					 __global const Camera* camera,
+                     __global const Sphere* spheres, int sphere_count,
+					 __global const Material* materials, int material_count,
                      float random_seed, __global uchar4* output)
 {
     int x = get_global_id(0), y = get_global_id(1);
@@ -210,26 +209,12 @@ __kernel void render(int width, int height,
     uint seed0 = x;
     uint seed1 = y;
 
-
-    Camera camera;
-    camera.focal_length     = 1.0f;
-    camera.view_port_height = 1.0f;
-    camera.view_port_width  = camera.view_port_height * ((float)width/(float)height);
-    camera.center = (float3)(0,0,0);
-    camera.viewport_x = (float3)(camera.view_port_width, 0, 0);
-    camera.viewport_y = (float3)(0, -camera.view_port_height, 0);
-    camera.pixel_delta_x = camera.viewport_x / (float)width;
-    camera.pixel_delta_y = camera.viewport_y / (float)height;
-    camera.viewport_upper_left = camera.center - (float3)(0,0,camera.focal_length)
-                               - camera.viewport_x*0.5f - camera.viewport_y*0.5f;
-    camera.pixel00_pos = camera.viewport_upper_left; // we'll add 0.5 in create_ray
-
     float3 sum = (float3)(0);
     for(int j = 0; j != SAMPLES; j++) {
         for (int s = 0; s < SAMPLES_PER_PIXEL; ++s) {
             float2 jitter = sample_square(&random_seed, &seed0, &seed1);
             Ray camray = create_ray(x, y, &camera, jitter);
-            sum += trace(spheres, &camray, obj_num, &seed0, &seed1);
+            sum += trace(spheres, &camray, sphere_count, &seed0, &seed1);
         }
     }
 

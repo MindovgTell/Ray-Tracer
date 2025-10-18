@@ -11,15 +11,10 @@ namespace compute {
     };
 
     struct Config {
-        int width = 800;
-        int height = 600;
-        int samples_per_pixel = 100;
-        int max_depth = 50;
-
         struct OpenCl {
         int platform_index = 0;
         int device_index   = 0;
-        std::string build_options; // e.g. "-cl-std=CL1.2 -cl-fast-relaxed-math"
+        std::string build_options = ""; // e.g. "-cl-std=CL1.2 -cl-fast-relaxed-math"
         } cl;
     };
 

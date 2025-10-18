@@ -11,26 +11,42 @@ int main() {
         // Create a scene with some spheres and materials
         Scene scene;
 
+        // Adding spheres to scene
+        const size_t obj_num = 5;
+
+        std::vector<Sphere> spheres(obj_num);
+
+        for (int i = 0; i != 2; i++) {
+            spheres[i].set_radius(1.0f);
+            spheres[i].set_center_pos(vec3{-2.5f + i*2.5f, -1.0f, -6.0f }); // much closer
+            spheres[i].set_color(vec3{ 0.9f - 0.3f*i, 0.2f + 0.3f*i, 0.2f });
+            spheres[i].set_emission(vec3{ 0.0f, 0.0f, 0.0f }); 
+        }
+
+        spheres[3].set_radius(0.5f);
+        spheres[3].set_center_pos(vec3{ 0.0f, 2.0f, -5.0f }); // much closer
+        spheres[3].set_color(vec3{ 0.5f, 0.5f, 1.0f });
+        spheres[3].set_emission(vec3{ 50.0f, 50.0f, 50.0f }); 
+
+        spheres[4].set_radius(98.0f);
+        spheres[4].set_center_pos(vec3{ 0.0f, -100.0f, -6.0f }); // much closer
+        spheres[4].set_color(vec3{ 0.3f, 0.3f, 0.9f });
+        spheres[4].set_emission(vec3{ 0.0f, 0.0f, 0.0f }); 
+
+
+        scene.set_spheres_vec(spheres);
+
+
         // Create a camera
-        Camera cam;
-        cam.aspect_ratio      = 16.0 / 9.0;
-        cam.image_width       = 1440;
-        cam.samples_per_pixel = 20;
-        cam.max_depth         = 50;
+        Camera cam(1440, (16.0/ 9.0));
+        cam.set_samples_per_pixel(20);
+        cam.set_max_depth(50);
 
-        cam.vfov     = 20;
-        cam.lookfrom = glm::vec3(13,2,3);
-        cam.lookat   = glm::vec3(0,0,0);
-        cam.vup      = glm::vec3(0,1,0);
-
+        cam.initialize();
     
 
         // Configure the backend
         compute::Config config;
-        config.width = 1440;
-        config.height = 1080;
-        config.samples_per_pixel = 100;
-        config.max_depth = 50;
         config.cl.platform_index = 0;
         config.cl.device_index = 0;
         config.cl.build_options = "-cl-std=CL1.2 -cl-fast-relaxed-math";
