@@ -12,29 +12,28 @@ class Mesh {
 
 class Sphere {
     public:
-        Sphere () : radius(1.0f), center{0.0f, 0.0f, 0.0f}, color{1.0f, 1.0f, 1.0f}, emission{0.0f, 0.0f, 0.0f} {}
+        Sphere () : radius(1.0f), center{0.0f, 0.0f, 0.0f}, emission{0.0f, 0.0f, 0.0f} {}
+        Sphere (float r, vec3 cent, vec3 emi, std::shared_ptr<Material> m) : 
+            radius(r), center(cent), emission(emi), mat(m) {}
 
         // Getter functions
         const float get_radius()   const       { return radius;    }
         const glm::vec3 get_center_pos()   const   { return center;    }
-        const glm::vec3 get_color()   const    { return color;     }
         const glm::vec3 get_emission()  const  { return emission;  }
-        const MatTag get_material_index() const { return material;  }
+        const std::shared_ptr<Material>& get_material_ptr() const {return mat;}
 
 
         // Setter functions
         void set_radius(float r)            { radius    = r;    }
-        void set_center_pos(glm::vec3 cent)     { center    = cent; }
-        void set_color(glm::vec3 col)       { color     = col;  }
+        void set_center_pos(glm::vec3 cent) { center    = cent; }
         void set_emission(glm::vec3 emi)    { emission  = emi;  }
 
 
     private:
         float radius;
         glm::vec3 center;
-        glm::vec3 color;
         glm::vec3 emission;
-        MatTag material{0};
+        std::shared_ptr<Material> mat;
 };
 
 class Scene {
@@ -56,8 +55,12 @@ public:
         spheres = vec;
     }
 
-    int get_spheres_count() {return spheres.size();} 
-    int get_spheres_count() {return materials.size();}
+    void set_materials_vec(const std::vector<std::shared_ptr<Material>>& vec) {
+        materials = vec;
+    }
+
+    int get_spheres_count() const {return spheres.size();} 
+    int get_materials_count() const {return materials.size();}
 
 };
 

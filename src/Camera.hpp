@@ -1,10 +1,9 @@
 #ifndef CAMERA_HPP
 #define CAMERA_HPP
 
+#include "Utils.hpp"
+
 class Camera {
-
-
-
 private:
     // Previously public
     double aspect_ratio      = 1.0;  // Ratio of image width over height
@@ -14,7 +13,7 @@ private:
 
     double vfov     = 90.0;              // Vertical view angle (field of view)
     point3 lookfrom = point3(0,0,0);   // Point camera is looking from
-    point3 lookat   = point3(0,0,-1);  // Point camera is looking at
+    point3 lookat   = point3(0,0,-3);  // Point camera is looking at
     vec3   vup      = vec3(0,1,0);     // Camera-relative "up" direction
 
     double focus_dist = 1.0;    // Distance from camera lookfrom point to plane of perfect focus
@@ -27,14 +26,6 @@ private:
     vec3   pixel_delta_x;        // Offset to pixel to the right
     vec3   pixel_delta_y;        // Offset to pixel below
     vec3   u, v, w;              // Camera frame basis vectors
-
-
-
-
-    inline vec3 unit_vector(const vec3& v) {
-        return {v.x / v.length(), v.y / v.length(), v.z / v.length()};
-    }
-
 
 public: 
 
@@ -100,12 +91,12 @@ public:
         image_height = int(image_width / aspect_ratio);
         image_height = (image_height < 1) ? 1 : image_height;
 
-        pixel_samples_scale = 1.0 / samples_per_pixel;
-
         origin = lookfrom;
 
+        pixel_samples_scale = 1.0 / samples_per_pixel;
+
         // Determine viewport dimensions.
-        auto focal_length = (lookfrom - lookat).length();
+
         auto theta = degrees_to_radians(vfov);
         auto h = std::tan(theta/2);
         auto viewport_height = 2 * h * focus_dist;
@@ -116,29 +107,24 @@ public:
         u = unit_vector(cross(vup, w));
         v = cross(w, u);
 
+        
         // Calculate the vectors across the horizontal and down the vertical viewport edges.
-        vec3 viewport_x = u;
-        viewport_x *= viewport_width;    // Vector across viewport horizontal edge
-        vec3 viewport_y = -v;  // Vector down viewport vertical edge
-        viewport_y *= viewport_height;
+        vec3 viewport_x = viewport_width * u;    // Vector across viewport horizontal edge
+        vec3 viewport_y = viewport_height * -v;  // Vector down viewport vertical edge
 
-        // Calculate the horizontal and vertical delta vectors to the next pixel.
-        pixel_delta_x = viewport_x;
-        pixel_delta_x /= image_width;
-        pixel_delta_y = viewport_y;
-        pixel_delta_y /= image_height;
+
+        // Calculate the horizontal and vertical delta vectors from pixel to pixel.
+        pixel_delta_x = viewport_x / image_width;
+        pixel_delta_y = viewport_y / image_height;
 
         // Calculate the location of the upper left pixel.
-        auto fw = w;
-        fw *= focus_dist;
-        auto vx2 = viewport_x;
-        vx2 /= 2;
-        auto vy2 = viewport_y;
-        vy2 /= 2;
-        auto viewport_upper_left = origin - fw - vx2 - vy2;
-        auto pixel_delta = (pixel_delta_x + pixel_delta_y);
-        pixel_delta *= 0.5;
-        pixel00_loc = viewport_upper_left + pixel_delta;
+        auto viewport_upper_left = origin - (focus_dist * w) - viewport_x/2 - viewport_y/2;
+        pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_x + pixel_delta_y);
+
+        // // Calculate the camera defocus disk basis vectors.
+        // auto defocus_radius = focus_dist * std::tan(degrees_to_radians(defocus_angle / 2));
+        // defocus_disk_u = u * defocus_radius;
+        // defocus_disk_v = v * defocus_radius;
     }
 
 };

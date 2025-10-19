@@ -43,7 +43,7 @@ namespace compute {
     }
 
     inline void upload_scene(cl::Context& ctx, cl::CommandQueue& q,
-                         const PackedScene& ps, GpuSceneBuffers& gpu)
+                         const serialize::PackedScene& ps, GpuSceneBuffers& gpu)
     {
         // Ensure buffers
         ensure(ctx, gpu.spheres,    ps.spheres.size()*sizeof(serialize::SphereGpu),     CL_MEM_READ_ONLY, gpu.spheres_bytes);

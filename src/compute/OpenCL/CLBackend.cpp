@@ -53,16 +53,20 @@ namespace compute {
         // get real rundom number
         cl_float randomseed = clutils::get_random();
 
+        cl_int s_count = scene.get_spheres_count();
+        cl_int m_count = scene.get_materials_count();
+
         // Kernel: __kernel void render(const int height, const int width, __global uchar4* C)
         kernel_ = cl::Kernel(program_, "render");
-        int a = 0;
-        kernel_.setArg(a++, W);
-        kernel_.setArg(a++, H);
-        kernel_.setArg(a++, gpu_scene_.camera);
-        kernel_.setArg(a++, gpu_scene_.spheres); kernel_.setArg(a++, scene.get_spheres_count());
-        kernel_.setArg(a++, gpu_sceen_.materials); kernel_.setArg(a++, scene.get_materials_count());
-        kernel_.setArg(a++, randomseed);
-        kernel_.setArg(a++, gpu_scene_.out_rgb);
+        kernel_.setArg(0, W);
+        kernel_.setArg(1, H);
+        kernel_.setArg(2, gpu_scene_.camera);
+        kernel_.setArg(3, gpu_scene_.spheres); 
+        kernel_.setArg(4, s_count);
+        kernel_.setArg(5, gpu_scene_.materials);
+        kernel_.setArg(6, m_count);
+        kernel_.setArg(7, randomseed);
+        kernel_.setArg(8, gpu_scene_.out_rgb);
 
         // One work-item per pixel (x = 0..W-1, y = 0..H-1)
         cl::NDRange global(W, H);
@@ -71,7 +75,7 @@ namespace compute {
 
         // Read back
         std::vector<cl_uchar4> output(N);
-        q_.enqueueReadBuffer(gpu_.out_rgb, CL_TRUE, 0, N*sizeof(cl_char4), out.data());
+        queue_.enqueueReadBuffer(gpu_scene_.out_rgb, CL_TRUE, 0, N*sizeof(cl_char4), output.data());
 
         // Save / use output (example loop)
         save_image("rednerer3.ppm", output, W, H);
