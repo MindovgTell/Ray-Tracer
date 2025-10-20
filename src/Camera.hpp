@@ -12,8 +12,8 @@ private:
     int    max_depth         = 10;   // Maximum number of ray bounces into scene
 
     double vfov     = 90.0;              // Vertical view angle (field of view)
-    point3 lookfrom = point3(0,0,0);   // Point camera is looking from
-    point3 lookat   = point3(0,0,-3);  // Point camera is looking at
+    point3 lookfrom = point3(0,1,4);   // Point camera is looking from
+    point3 lookat   = point3(0,1,1);  // Point camera is looking at
     vec3   vup      = vec3(0,1,0);     // Camera-relative "up" direction
 
     double focus_dist = 1.0;    // Distance from camera lookfrom point to plane of perfect focus

@@ -1,7 +1,7 @@
-__constant float EPSILON = 0.00003f; /* required to compensate for limited float precision */
+__constant float EPSILON = 1e-3f; /* required to compensate for limited float precision */
 __constant float PI = 3.14159265359f;
-__constant int SAMPLES = 25;
-__constant int SAMPLES_PER_PIXEL =  200;
+__constant int SAMPLES = 100;
+__constant int SAMPLES_PER_PIXEL =  150;
 
 #define MAT_LAMBERTIAN 0
 #define MAT_METAL 1
@@ -76,6 +76,27 @@ static inline float2 sample_square(const __private float* fseed,
     return (float2)(jx, jy);
 }
 
+// static inline float2 sample_square(const __private float* fseed,
+//                                    uint* seed0, uint* seed1)
+// {
+//     // decorrelate to get jx
+//     uint a0 = (*seed0) ^ 0x9E3779B9u;
+//     uint a1 = (*seed1) ^ 0x85EBCA6Bu;
+//     float jx = get_random(&a0, &a1) - 0.5f;
+
+//     // decorrelate differently to get jy
+//     a0 ^= 0xC2B2AE35u; 
+//     a1 ^= 0x27D4EB2Fu;
+//     float jy = get_random(&a0, &a1) - 0.5f;
+
+//     return (float2)(jx, jy);
+// }
+
+inline float3 offset_along_normal(float3 p, float3 n, float3 newdir) {
+    float s = (dot(newdir, n) >= 0.0f) ? 1.0f : -1.0f;
+    return p + n * (s * EPSILON);
+}
+
 static inline Ray create_ray(int x, int y, __global const Camera* cam, float2 jitter)
 {
     Ray r; 
@@ -132,13 +153,13 @@ bool intersect_scene(__global const Sphere* spheres, const Ray* ray, float* t, i
 }
 
 
-void lambert_scatter(const Sphere* hitsphere, Ray* ray, const Material* mat, float* t,float* xi1, float* xi2, float3* accum_color, float3* mask ) {
+void lambert_scatter(const Sphere* hitsphere, Ray* ray, const Material* mat, float* t, float* xi1, float* xi2, float3* accum_color, float3* mask ) {
 	/* compute the hitpoint using the ray equation */
 	float3 hitpoint = ray->origin.xyz + ray->direction.xyz * (*t);
 	
 	/* compute the surface normal and flip it if necessary to face the incoming ray */
 	float3 normal = normalize(hitpoint - hitsphere->center_r.xyz); 
-	float3 normal_facing = dot(normal, ray->direction.xyz) < 0.0f ? normal : normal * (-1.0f);
+	float3 w = dot(normal, ray->direction.xyz) < 0.0f ? normal : normal * (-1.0f);
 
 	
 	float phi = 2.0f * PI * (*xi1);
@@ -146,7 +167,7 @@ void lambert_scatter(const Sphere* hitsphere, Ray* ray, const Material* mat, flo
 	float r2s = sqrt(r2);
 
 	/* create a local orthogonal coordinate frame centered at the hitpoint */
-	float3 w = normal_facing;
+
 	float3 axis = fabs(w.x) > 0.1f ? (float3)(0.0f, 1.0f, 0.0f) : (float3)(1.0f, 0.0f, 0.0f);
 	float3 u = normalize(cross(axis, w));
 	float3 v = cross(w, u);
@@ -155,13 +176,13 @@ void lambert_scatter(const Sphere* hitsphere, Ray* ray, const Material* mat, flo
 	float3 newdir = normalize(u * cos(phi)*r2s + v*sin(phi)*r2s + w*sqrt(1.0f - r2));
 
 	/* add a very small offset to the hitpoint to prevent self intersection */
-	ray->origin = (float4)(hitpoint + normal_facing * EPSILON, 0.0f);
+	ray->origin = (float4)(hitpoint + w * EPSILON, 0.0f);
 	ray->direction = (float4)(newdir, 0.0f);
 
 	(*accum_color) += (*mask) * hitsphere->emission.xyz; // keep if you actually use emission
 	(*mask) *= (float3)(mat->albedo_fuzz.x, mat->albedo_fuzz.y, mat->albedo_fuzz.z);
 	// cosine-weighted term belongs to lambert:
-	(*mask) *= fmax(dot(newdir, normal_facing), 0.0f);
+	(*mask) *= fmax(dot(newdir, w), 0.0f);
 }
 
 
@@ -171,38 +192,178 @@ inline float3 reflect(const float3* direction, const float3* normal) {
 }
 
 
-void metal_scatter(const Sphere* hitsphere, Ray* ray, const Material* mat,float* t, float3* accum_color, float3* mask, const float3* jitter )  {
-		/* compute the hitpoint using the ray equation */
-	float3 hitpoint = ray->origin.xyz + ray->direction.xyz * (*t);
-	
-	/* compute the surface normal and flip it if necessary to face the incoming ray */
-	float3 normal = normalize(hitpoint - hitsphere->center_r.xyz); 
-	float3 normal_facing = dot(normal, ray->direction.xyz) < 0.0f ? normal : normal * (-1.0f);
-
-	/* create a local orthogonal coordinate frame centered at the hitpoint */
-	float3 w = normal_facing;
-	float3 axis = fabs(w.x) > 0.1f ? (float3)(0.0f, 1.0f, 0.0f) : (float3)(1.0f, 0.0f, 0.0f);
-	float3 u = normalize(cross(axis, w));
-	float3 v = cross(w, u);
-
-	float3 dir = ray->direction.xyz;
 
 
+void metal_scatter(const Sphere* hitsphere, Ray* ray, const Material* mat, float* t,
+                   float3* accum_color, float3* mask, const float3* _unused) {
 
-	float3 reflected = reflect(&dir, &w);
-	reflected = normalize(reflected + mat->albedo_fuzz.w * (*jitter));
+    float3 hitpoint = ray->origin.xyz + ray->direction.xyz * (*t);
+    float3 n        = normalize(hitpoint - hitsphere->center_r.xyz);
+    float3 w        = dot(n, ray->direction.xyz) < 0.0f ? n : -n;
 
+    float3 dir = ray->direction.xyz;
+    float3 reflected = reflect(&dir, &w);
 
-	/* add a very small offset to the hitpoint to prevent self intersection */
-	ray->origin = (float4)(hitpoint + normal_facing * EPSILON, 0.0f);
-	ray->direction = (float4)(reflected, 0.0f);
+    // jitter WITHOUT normalization; scale by fuzz (already in mat->albedo_fuzz.w)
+    uint a = as_uint(hitpoint.x) ^ 0xC2B2AE35u;
+    uint b = as_uint(hitpoint.y) ^ 0x27D4EB2Fu;
+    float3 jitter = (float3)(
+        get_random(&a,&b) - 0.5f,
+        get_random(&a,&b) - 0.5f,
+        get_random(&a,&b) - 0.5f
+    );
 
+    float3 newdir = normalize(reflected + mat->albedo_fuzz.w * jitter);
 
-	(*accum_color) += (*mask) * hitsphere->emission.xyz;
-	(*mask) *= (float3)(mat->albedo_fuzz.x, mat->albedo_fuzz.y, mat->albedo_fuzz.z);
+    float3 neworig = offset_along_normal(hitpoint, w, newdir);
+    ray->origin    = (float4)(neworig, 0.0f);
+    ray->direction = (float4)(newdir, 0.0f);
+
+    (*accum_color) += (*mask) * hitsphere->emission.xyz;
+    (*mask) *= (float3)(mat->albedo_fuzz.x, mat->albedo_fuzz.y, mat->albedo_fuzz.z);
 }
 
-float3 dielectric_scatter() {}
+// void metal_scatter(const Sphere* hitsphere, Ray* ray, const Material* mat,float* t, float3* accum_color, float3* mask, const float3* jitter )  {
+// 		/* compute the hitpoint using the ray equation */
+// 	float3 hitpoint = ray->origin.xyz + ray->direction.xyz * (*t);
+	
+// 	/* compute the surface normal and flip it if necessary to face the incoming ray */
+// 	float3 normal = normalize(hitpoint - hitsphere->center_r.xyz); 
+
+
+// 	float3 w = dot(normal, ray->direction.xyz) < 0.0f ? normal : normal * (-1.0f);
+
+// 	/* create a local orthogonal coordinate frame centered at the hitpoint */
+// 	// float3 axis = fabs(w.x) > 0.1f ? (float3)(0.0f, 1.0f, 0.0f) : (float3)(1.0f, 0.0f, 0.0f);
+// 	// float3 u = normalize(cross(axis, w));
+// 	// float3 v = cross(w, u);
+
+// 	float3 dir = ray->direction.xyz;
+
+
+
+// 	float3 reflected = reflect(&dir, &w);
+// 	reflected = normalize(reflected + mat->albedo_fuzz.w * (*jitter));
+
+
+// 	/* add a very small offset to the hitpoint to prevent self intersection */
+// 	ray->origin = (float4)(hitpoint + w * EPSILON, 0.0f);
+// 	ray->direction = (float4)(reflected, 0.0f);
+
+
+// 	(*accum_color) += (*mask) * hitsphere->emission.xyz;
+// 	(*mask) *= (float3)(mat->albedo_fuzz.x, mat->albedo_fuzz.y, mat->albedo_fuzz.z);
+// }
+
+
+
+
+
+
+// inline float reflectance(float* cosine, float* refraction_index) {
+//         // Use Schlick's approximation for reflectance.
+//         float r0 = (1 - (*refraction_index)) / (1 + (*refraction_index));
+//         r0 = r0*r0;
+//         return r0 + (1-r0)*pow((1 - (*cosine)),5);
+// }
+
+// inline float length_squared(const float3* vec) {
+// 	return (float)(vec->x * vec->x + vec->y * vec->y + vec->z * vec->z);
+// }
+
+// inline float3 refract(const float3* uv, const float3* n, float etai_over_etat) {
+//     float cos_theta = fmin(dot(-(*uv), (*n)), 1.0);
+//     float3 r_out_perp =  etai_over_etat * ((*uv) + cos_theta*(*n));
+//     float3 r_out_parallel = -sqrt(fabs(1.0 - length_squared(&r_out_perp))) * (*n);
+//     return r_out_perp + r_out_parallel;
+// }
+
+// void dielectric_scatter(const Sphere* hitsphere, Ray* ray, const Material* mat,float* t, float3* accum_color, float3* mask, float* xi) {
+// 	float3 hitpoint = ray->origin.xyz + ray->direction.xyz * (*t);
+	
+// 	/* compute the surface normal and flip it if necessary to face the incoming ray */
+// 	float3 normal = normalize(hitpoint - hitsphere->center_r.xyz); 
+// 	bool front_face = dot(normal, ray->direction.xyz) < 0.0f;
+
+
+// 	/* create a local orthogonal coordinate frame centered at the hitpoint */
+// 	float3 w = front_face ? normal : normal * (-1.0f);
+
+// 	float3 axis = fabs(w.x) > 0.1f ? (float3)(0.0f, 1.0f, 0.0f) : (float3)(1.0f, 0.0f, 0.0f);
+// 	float3 u = normalize(cross(axis, w));
+// 	float3 v = cross(w, u);
+
+// 	// *accum_color = (float3)(1.0, 1.0, 1.0);
+
+// 	float ri = front_face ? (1.0/(mat->ref_idx)) : mat->ref_idx;
+
+// 	float cos_theta = fmin(dot(-(ray->direction.xyz), w), 1.0);
+// 	float sin_theta = sqrt(1.0 - cos_theta*cos_theta);
+
+// 	bool cannot_refract = ri * sin_theta > 1.0;
+// 	float3 direction;
+// 	float3 dir = ray->direction.xyz;
+// 	if(cannot_refract || reflectance(&cos_theta, &ri) > *xi)
+// 		direction = reflect(&dir, &normal);
+// 	else
+// 		direction = refract(&dir, &normal, ri);
+
+// 	ray->origin = (float4)(hitpoint + w * EPSILON, 0.0f);
+// 	ray->direction = (float4)(direction, 0.0f);
+// }
+
+
+
+
+
+inline float reflectance(float cosine, float ri) {
+    float r0 = (1.0f - ri) / (1.0f + ri);
+    r0 = r0 * r0;
+    return r0 + (1.0f - r0) * pow(1.0f - cosine, 5.0f);
+}
+
+inline float3 refract_dir(const float3 in, const float3 n, float eta) {
+    float cosi = clamp(-dot(in, n), 0.0f, 1.0f);
+    float sint2 = max(0.0f, 1.0f - cosi*cosi);
+    float k = 1.0f - eta*eta * sint2;
+    if (k < 0.0f) return (float3)(0,0,0); // TIR flag (caller should reflect)
+    return normalize(eta*in + (eta*cosi - sqrt(k))*n);
+}
+
+void dielectric_scatter(const Sphere* hitsphere, Ray* ray, const Material* mat,
+                        float* t, float3* accum_color, float3* mask, float* xi)
+{
+    float3 hit = ray->origin.xyz + ray->direction.xyz * (*t);
+    float3 n   = normalize(hit - hitsphere->center_r.xyz);
+    bool front = dot(ray->direction.xyz, n) < 0.0f;
+    float3 w   = front ? n : -n;
+
+    float eta = front ? (1.0f / mat->ref_idx) : mat->ref_idx;
+
+    float cos_theta = clamp(-dot(normalize(ray->direction.xyz), w), 0.0f, 1.0f);
+    float R = reflectance(cos_theta, eta);
+    float3 in = normalize(ray->direction.xyz);
+
+    float3 dir;
+    if ((*xi) < R) {
+        dir = reflect(&in, &w);
+    } else {
+        float3 tdir = refract_dir(in, w, eta);
+        if (tdir.x == 0.0f && tdir.y == 0.0f && tdir.z == 0.0f) {
+            dir = reflect(&in, &w); // TIR fallback
+        } else {
+            dir = tdir;
+        }
+    }
+
+    // Typically, dielectric has no absorption: keep mask as-is,
+    // or apply slight attenuation if you want (beer’s law).
+    ray->origin    = (float4)(hit + w * EPSILON, 0.0f);
+    ray->direction = (float4)(normalize(dir), 0.0f);
+}
+
+
+
 
 
 /* the path tracing function */
@@ -223,7 +384,7 @@ float3 trace( __global const Sphere* spheres,
 	float3 accum_color = (float3)(0.0f, 0.0f, 0.0f);
 	float3 mask = (float3)(1.0f, 1.0f, 1.0f);
 
-	for (int bounces = 0; bounces < 25; bounces++){
+	for (int bounces = 0; bounces < 10; bounces++){
 
 		float t;   /* distance to intersection */
 		int hitsphere_id = 0; /* index of intersected sphere */
@@ -233,7 +394,7 @@ float3 trace( __global const Sphere* spheres,
 		{
             float3 d = normalize((float3)(ray.direction.xyz));
             float tbg = 0.5f*(d.y + 1.0f);
-            float3 sky = mix((float3)(0.2f,0.2f,1.0f), (float3)(0.0f,0.0f,0.0f), tbg);
+            float3 sky = mix((float3)(0.0f,0.0f,1.0f), (float3)(0.8f,0.8f,1.0f), tbg);
             return accum_color + mask * sky;
         }
 
@@ -258,8 +419,8 @@ float3 trace( __global const Sphere* spheres,
 				break;
 			}
 			case MAT_METAL : {
-				uint salt0 = (uint)*seed0 ^ 0x9E3779B9u;
-				uint salt1 = (uint)*seed1 ^ 0x85EBCA6Bu;
+				uint salt0 = (uint)*seed0 ^ 0xC2B2AE35u;
+				uint salt1 = (uint)*seed1 ^ 0x27D4EB2Fu;
 				float3 jitter = normalize((float3)(
 					get_random(&salt0,&salt1) - 0.5f,
 					get_random(&salt0,&salt1) - 0.5f,
@@ -270,7 +431,11 @@ float3 trace( __global const Sphere* spheres,
 			}
 
 			case MAT_DIELECTRIC : {
+				uint salt0 = (uint)*seed0 ^ (uint)(bounces*2+0) * 0x9E3779B9u;
+				uint salt1 = (uint)*seed1 ^ (uint)(bounces*2+1) * 0x85EBCA6Bu;
 
+				float xi1 = get_random(&salt0, &salt1); // in [0,1)
+				dielectric_scatter(&hitsphere, &ray, &material, &t, &accum_color, &mask, &xi1);
 				break;
 			}
 
