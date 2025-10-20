@@ -2,7 +2,7 @@
 _A small GPU path tracer inspired by **Ray Tracing in One Weekend**._
 
 <p align="center">
-  <img src="https://github.com/MindovgTell/Ray-Tracer/blob/master/images/renderer2.png" alt="Hero render" width="80%">
+  <img src=https://github.com/MindovgTell/Ray-Tracer/blob/master/images/rednerer3.png alt="Hero render" width="80%">
 </p>
 
 ## Highlights
@@ -18,13 +18,12 @@ _A small GPU path tracer inspired by **Ray Tracing in One Weekend**._
 > Drop your images here (PNG/JPG). Keep a few noisy → clean comparisons to show convergence.
 
 <p align="center">
-  <img src="docs/spheres_noisy.png" alt="Spheres noisy" width="48%">
-  <img src="docs/spheres_clean.png" alt="Spheres clean" width="48%">
+  <img src="https://github.com/MindovgTell/Ray-Tracer/blob/master/images/renderer2.png" alt="Spheres noisy" width="48%">
 </p>
-
+<!-- 
 <p align="center">
   <img src="docs/aa_compare.png" alt="AA comparison" width="80%">
-</p>
+</p> -->
 
 ---
 
