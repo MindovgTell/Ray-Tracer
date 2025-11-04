@@ -55,17 +55,17 @@ namespace compute::serialize {
             return it->second;
         MaterialGpu mg{}; // zero-init padding too
         if (auto* lam = dynamic_cast<Lambertian*>(key); lam != nullptr) {
-            mg.type      = MAT_LAMBERTIAN;
-            mg.albedo_fuzz    = to_f4(lam->albedo, 0.0f);
-            mg.ref_idx        = 1.0f;
+            mg.type          = MAT_LAMBERTIAN;
+            mg.albedo_fuzz   = to_f4(lam->albedo, 0.0f);
+            mg.ref_idx       = 1.0f;
         } else if (auto* met = dynamic_cast<Metal*>(key); met != nullptr) {
-            mg.type      = MAT_METAL;
-            mg.albedo_fuzz    = to_f4(met->albedo, met->fuzz);
+            mg.type          = MAT_METAL;
+            mg.albedo_fuzz   = to_f4(met->albedo, met->fuzz);
             mg.ref_idx       = 1.0f;
         } else if (auto* die = dynamic_cast<Dielectric*>(key); die != nullptr) {
-            mg.type      = MAT_DIELECTRIC;
+            mg.type          = MAT_DIELECTRIC;
             mg.albedo_fuzz   = to_f4({1,1,1}, 0.0f); // unused; keep sane default
-            mg.ref_idx   = die->ref_idx;
+            mg.ref_idx       = die->ref_idx;
         } else {
             throw std::runtime_error("Unknown material subtype");
         }

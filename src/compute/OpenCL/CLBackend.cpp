@@ -78,7 +78,7 @@ namespace compute {
         queue_.enqueueReadBuffer(gpu_scene_.out_rgb, CL_TRUE, 0, N*sizeof(cl_char4), output.data());
 
         // Save / use output (example loop)
-        save_image("rednerer3.ppm", output, W, H);
+        save_image("rednerer4.ppm", output, W, H);
 
     }
 

@@ -1,7 +1,7 @@
 __constant float EPSILON = 1e-3f; /* required to compensate for limited float precision */
 __constant float PI = 3.14159265359f;
 __constant int SAMPLES = 100;
-__constant int SAMPLES_PER_PIXEL =  150;
+__constant int SAMPLES_PER_PIXEL =  50;
 
 #define MAT_LAMBERTIAN 0
 #define MAT_METAL 1
@@ -223,98 +223,10 @@ void metal_scatter(const Sphere* hitsphere, Ray* ray, const Material* mat, float
     (*mask) *= (float3)(mat->albedo_fuzz.x, mat->albedo_fuzz.y, mat->albedo_fuzz.z);
 }
 
-// void metal_scatter(const Sphere* hitsphere, Ray* ray, const Material* mat,float* t, float3* accum_color, float3* mask, const float3* jitter )  {
-// 		/* compute the hitpoint using the ray equation */
-// 	float3 hitpoint = ray->origin.xyz + ray->direction.xyz * (*t);
-	
-// 	/* compute the surface normal and flip it if necessary to face the incoming ray */
-// 	float3 normal = normalize(hitpoint - hitsphere->center_r.xyz); 
-
-
-// 	float3 w = dot(normal, ray->direction.xyz) < 0.0f ? normal : normal * (-1.0f);
-
-// 	/* create a local orthogonal coordinate frame centered at the hitpoint */
-// 	// float3 axis = fabs(w.x) > 0.1f ? (float3)(0.0f, 1.0f, 0.0f) : (float3)(1.0f, 0.0f, 0.0f);
-// 	// float3 u = normalize(cross(axis, w));
-// 	// float3 v = cross(w, u);
-
-// 	float3 dir = ray->direction.xyz;
 
 
 
-// 	float3 reflected = reflect(&dir, &w);
-// 	reflected = normalize(reflected + mat->albedo_fuzz.w * (*jitter));
-
-
-// 	/* add a very small offset to the hitpoint to prevent self intersection */
-// 	ray->origin = (float4)(hitpoint + w * EPSILON, 0.0f);
-// 	ray->direction = (float4)(reflected, 0.0f);
-
-
-// 	(*accum_color) += (*mask) * hitsphere->emission.xyz;
-// 	(*mask) *= (float3)(mat->albedo_fuzz.x, mat->albedo_fuzz.y, mat->albedo_fuzz.z);
-// }
-
-
-
-
-
-
-// inline float reflectance(float* cosine, float* refraction_index) {
-//         // Use Schlick's approximation for reflectance.
-//         float r0 = (1 - (*refraction_index)) / (1 + (*refraction_index));
-//         r0 = r0*r0;
-//         return r0 + (1-r0)*pow((1 - (*cosine)),5);
-// }
-
-// inline float length_squared(const float3* vec) {
-// 	return (float)(vec->x * vec->x + vec->y * vec->y + vec->z * vec->z);
-// }
-
-// inline float3 refract(const float3* uv, const float3* n, float etai_over_etat) {
-//     float cos_theta = fmin(dot(-(*uv), (*n)), 1.0);
-//     float3 r_out_perp =  etai_over_etat * ((*uv) + cos_theta*(*n));
-//     float3 r_out_parallel = -sqrt(fabs(1.0 - length_squared(&r_out_perp))) * (*n);
-//     return r_out_perp + r_out_parallel;
-// }
-
-// void dielectric_scatter(const Sphere* hitsphere, Ray* ray, const Material* mat,float* t, float3* accum_color, float3* mask, float* xi) {
-// 	float3 hitpoint = ray->origin.xyz + ray->direction.xyz * (*t);
-	
-// 	/* compute the surface normal and flip it if necessary to face the incoming ray */
-// 	float3 normal = normalize(hitpoint - hitsphere->center_r.xyz); 
-// 	bool front_face = dot(normal, ray->direction.xyz) < 0.0f;
-
-
-// 	/* create a local orthogonal coordinate frame centered at the hitpoint */
-// 	float3 w = front_face ? normal : normal * (-1.0f);
-
-// 	float3 axis = fabs(w.x) > 0.1f ? (float3)(0.0f, 1.0f, 0.0f) : (float3)(1.0f, 0.0f, 0.0f);
-// 	float3 u = normalize(cross(axis, w));
-// 	float3 v = cross(w, u);
-
-// 	// *accum_color = (float3)(1.0, 1.0, 1.0);
-
-// 	float ri = front_face ? (1.0/(mat->ref_idx)) : mat->ref_idx;
-
-// 	float cos_theta = fmin(dot(-(ray->direction.xyz), w), 1.0);
-// 	float sin_theta = sqrt(1.0 - cos_theta*cos_theta);
-
-// 	bool cannot_refract = ri * sin_theta > 1.0;
-// 	float3 direction;
-// 	float3 dir = ray->direction.xyz;
-// 	if(cannot_refract || reflectance(&cos_theta, &ri) > *xi)
-// 		direction = reflect(&dir, &normal);
-// 	else
-// 		direction = refract(&dir, &normal, ri);
-
-// 	ray->origin = (float4)(hitpoint + w * EPSILON, 0.0f);
-// 	ray->direction = (float4)(direction, 0.0f);
-// }
-
-
-
-
+// Calculates reflectance for Dielectric materials using Schlick's approximation
 
 inline float reflectance(float cosine, float ri) {
     float r0 = (1.0f - ri) / (1.0f + ri);
@@ -330,6 +242,41 @@ inline float3 refract_dir(const float3 in, const float3 n, float eta) {
     return normalize(eta*in + (eta*cosi - sqrt(k))*n);
 }
 
+// void dielectric_scatter(const Sphere* hitsphere, Ray* ray, const Material* mat,
+//                         float* t, float3* accum_color, float3* mask, float* xi)
+// {
+//     float3 hit = ray->origin.xyz + ray->direction.xyz * (*t);
+//     float3 n   = normalize(hit - hitsphere->center_r.xyz);
+//     bool front = dot(ray->direction.xyz, n) < 0.0f;
+//     float3 w   = front ? n : -n;
+
+//     float eta = front ? (1.0f / mat->ref_idx) : mat->ref_idx;
+
+//     float cos_theta = clamp(-dot(normalize(ray->direction.xyz), w), 0.0f, 1.0f);
+//     // Schlick's approximation expects the refractive index (n), not the ratio n1/n2.
+// 	float R = reflectance(cos_theta, mat->ref_idx);
+//     float3 in = normalize(ray->direction.xyz);
+
+//     float3 dir;
+//     if ((*xi) < R) {
+//         dir = reflect(&in, &w);
+//     } else {
+//         float3 tdir = refract_dir(in, w, eta);
+//         if (tdir.x == 0.0f && tdir.y == 0.0f && tdir.z == 0.0f) {
+//             dir = reflect(&in, &w); // TIR fallback
+//         } else {
+//             dir = tdir;
+//         }
+//     }
+
+
+
+//     // Typically, dielectric has no absorption: keep mask as-is,
+//     // or apply slight attenuation if you want (beer’s law).
+//     ray->origin    = (float4)(hit + w * EPSILON, 0.0f);
+//     ray->direction = (float4)(normalize(dir), 0.0f);
+// }
+
 void dielectric_scatter(const Sphere* hitsphere, Ray* ray, const Material* mat,
                         float* t, float3* accum_color, float3* mask, float* xi)
 {
@@ -339,27 +286,40 @@ void dielectric_scatter(const Sphere* hitsphere, Ray* ray, const Material* mat,
     float3 w   = front ? n : -n;
 
     float eta = front ? (1.0f / mat->ref_idx) : mat->ref_idx;
-
-    float cos_theta = clamp(-dot(normalize(ray->direction.xyz), w), 0.0f, 1.0f);
-    float R = reflectance(cos_theta, eta);
     float3 in = normalize(ray->direction.xyz);
 
-    float3 dir;
-    if ((*xi) < R) {
-        dir = reflect(&in, &w);
+    // cosine between incoming ray and surface normal (clamped)
+    float cos_theta = clamp(-dot(in, w), 0.0f, 1.0f);
+
+    // When the ray is exiting the medium we should use the transmitted-angle cosine
+    // for Schlick's approximation to get the correct reflect probability.
+    float R;
+    if (!front) {
+        // compute the cosine of the transmitted angle (safe-guard sqrt)
+        float tmp = 1.0f - eta*eta * (1.0f - cos_theta * cos_theta);
+        float cos_trans = tmp > 0.0f ? sqrt(tmp) : 0.0f;
+        R = reflectance(cos_trans, mat->ref_idx);
     } else {
-        float3 tdir = refract_dir(in, w, eta);
-        if (tdir.x == 0.0f && tdir.y == 0.0f && tdir.z == 0.0f) {
-            dir = reflect(&in, &w); // TIR fallback
-        } else {
-            dir = tdir;
-        }
+        R = reflectance(cos_theta, mat->ref_idx);
     }
 
-    // Typically, dielectric has no absorption: keep mask as-is,
-    // or apply slight attenuation if you want (beer’s law).
-    ray->origin    = (float4)(hit + w * EPSILON, 0.0f);
+    // Decide reflection vs refraction (handle TIR in refract_dir)
+    float3 dir;
+    float3 tdir = refract_dir(in, w, eta);
+    bool tir = (tdir.x == 0.0f && tdir.y == 0.0f && tdir.z == 0.0f);
+    if (tir || (*xi) < R) {
+        dir = reflect(&in, &w);
+    } else {
+        dir = tdir;
+    }
+
+    // Offset along correct side to avoid self-intersection (follows outgoing direction)
+    float3 neworig = offset_along_normal(hit, w, dir);
+    ray->origin    = (float4)(neworig, 0.0f);
     ray->direction = (float4)(normalize(dir), 0.0f);
+
+    // dielectric typically doesn't attenuate (no change to mask)
+    (*accum_color) += (*mask) * hitsphere->emission.xyz;
 }
 
 
