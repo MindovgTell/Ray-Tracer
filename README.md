@@ -2,7 +2,7 @@
 _A small GPU path tracer inspired by **Ray Tracing in One Weekend**._
 
 <p align="center">
-  <img src=https://github.com/MindovgTell/Ray-Tracer/blob/master/images/rednerer3.png alt="Hero render" width="80%">
+  <img src=https://github.com/MindovgTell/Ray-Tracer/blob/master/images/rednerer4.png alt="Hero render" width="80%">
 </p>
 
 ## Highlights
@@ -19,6 +19,7 @@ _A small GPU path tracer inspired by **Ray Tracing in One Weekend**._
 
 <p align="center">
   <img src="https://github.com/MindovgTell/Ray-Tracer/blob/master/images/renderer2.png" alt="Spheres noisy" width="48%">
+  <img src="https://github.com/MindovgTell/Ray-Tracer/blob/master/images/renderer3.png" alt="Spheres noisy" width="48%">
 </p>
 <!-- 
 <p align="center">
