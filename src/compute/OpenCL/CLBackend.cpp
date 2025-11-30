@@ -75,7 +75,7 @@ namespace compute {
 
         // Read back
         std::vector<cl_uchar4> output(N);
-        queue_.enqueueReadBuffer(gpu_scene_.out_rgb, CL_TRUE, 0, N*sizeof(cl_char4), output.data());
+        queue_.enqueueReadBuffer(gpu_scene_.out_rgb, CL_TRUE, 0, N*sizeof(cl_uchar4), output.data());
 
         // Save / use output (example loop)
         save_image("rednerer4.ppm", output, W, H);

@@ -8,8 +8,7 @@ _A small GPU path tracer inspired by **Ray Tracing in One Weekend**._
 ## Highlights
 - GPU-accelerated rendering with OpenCL 1.2 (vendor-agnostic).
 - Progressive path tracing with anti-aliasing and sky lighting.
-- Lambertian materials, multiple spheres, ground plane; emissive support.
-- Optional OpenCL↔OpenGL interop for real-time preview (WIP).
+- Lambertian, metal, dielectric materials. Multiple spheres, ground plane; emissive support.
 - Simple, extensible codebase (C++ host + OpenCL kernels).
 
 ---
@@ -34,8 +33,7 @@ _A small GPU path tracer inspired by **Ray Tracing in One Weekend**._
 
 ### Requirements
 - **C++17**, **CMake ≥ 3.16**
-- **OpenCL 1.2+** runtime (NVIDIA/AMD/Intel/etc.)
-- (Optional) **OpenGL** for interactive preview
+- **OpenCL 1.2+**
 
 ### Build
 ```bash
